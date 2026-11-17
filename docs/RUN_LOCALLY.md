@@ -17,6 +17,11 @@ docker compose ps                                             # wait until every
 Open **http://localhost:8000**, click *Create an account*, upload a PDF and ask a question.
 (macOS/Linux: run `./setup-env.sh` instead of the .ps1.)
 
+## First start
+The embeddings and reranker services load their models on first boot (1-3 minutes). `docker compose up` now
+waits for them (healthchecks), and the worker retries uploads for ~2 minutes if a service is still starting,
+so an upload right after boot no longer fails. Watch progress with `docker compose ps` (look for `healthy`).
+
 ## Notes
 - The first build downloads the embedding and reranker models, so it needs internet.
 - Never commit the `env/` folder or share it: it holds your API key. It is gitignored.
