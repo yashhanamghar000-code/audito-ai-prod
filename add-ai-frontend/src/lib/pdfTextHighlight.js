@@ -18,7 +18,7 @@
  *      highlights exactly the text items that window covers.
  */
 
-const MIN_MATCH_SCORE = 0.6; // fraction of words that must agree
+const MIN_MATCH_SCORE = 0.55; // weighted fraction of snippet words that must be found
 
 function normalizeWord(word) {
   return word.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -44,50 +44,93 @@ function buildPageWordIndex(textContent) {
 }
 
 /**
- * Finds the best-matching window of page words for the given snippet.
- * Returns the set of item indices to highlight, or an empty array if no
- * window scores above MIN_MATCH_SCORE.
+ * Finds the best-matching region of the page for the given snippet.
+ *
+ * Scoring is order-tolerant: for each candidate window of page words we
+ * count how many snippet words appear in it (as a multiset), plus a small
+ * bonus for words that are also in the right relative position. This keeps
+ * working when pdf.js emits text items in a different order than the chunk
+ * text (tables, columns), when a word is split or dropped, or when
+ * punctuation differs. The window is then trimmed to the first/last matched
+ * word so only the cited passage is highlighted, not padding around it.
+ *
+ * Returns the sorted item indices to highlight, or [] if nothing scores
+ * above MIN_MATCH_SCORE.
  */
 export function findMatchingItemIndices(textContent, snippet) {
   if (!snippet || !textContent?.items?.length) return [];
 
   const snippetWords = tokenize(snippet);
-  if (snippetWords.length === 0) return [];
+  if (snippetWords.length < 2) return [];
 
   const pageWords = buildPageWordIndex(textContent);
   if (pageWords.length === 0) return [];
 
-  const windowSize = snippetWords.length;
+  const need = new Map();
+  for (const w of snippetWords) need.set(w, (need.get(w) || 0) + 1);
+
+  const n = snippetWords.length;
+  const windowSize = Math.min(pageWords.length, Math.ceil(n * 1.5) + 2);
+
   let bestScore = 0;
   let bestStart = -1;
 
-  const lastStart = Math.max(0, pageWords.length - Math.min(windowSize, pageWords.length));
-  for (let start = 0; start <= lastStart; start++) {
+  for (let start = 0; start + windowSize <= pageWords.length || start === 0; start++) {
+    const have = new Map();
+    let overlap = 0;
     const end = Math.min(start + windowSize, pageWords.length);
-    let matches = 0;
     for (let i = start; i < end; i++) {
-      const snippetIdx = i - start;
-      if (snippetIdx < snippetWords.length && pageWords[i].word === snippetWords[snippetIdx]) {
-        matches++;
-      }
+      const w = pageWords[i].word;
+      const wanted = need.get(w) || 0;
+      const got = have.get(w) || 0;
+      if (got < wanted) overlap++;
+      have.set(w, got + 1);
     }
-    const score = matches / windowSize;
+    // Small bonus for the words that are also in the same relative order.
+    let ordered = 0;
+    for (let i = 0; i < n && start + i < pageWords.length; i++) {
+      if (pageWords[start + i].word === snippetWords[i]) ordered++;
+    }
+    const score = overlap / n + 0.15 * (ordered / n);
     if (score > bestScore) {
       bestScore = score;
       bestStart = start;
     }
-    if (score === 1) break; // perfect match, stop early
+    if (start + windowSize >= pageWords.length) break;
   }
 
-  if (bestStart === -1 || bestScore < MIN_MATCH_SCORE) {
-    return [];
-  }
+  if (bestStart === -1 || bestScore < MIN_MATCH_SCORE) return [];
 
+  // Trim to the tightest span that holds most of the matched words, so a stray
+  // coincidental word (e.g. "deposit" in the line above a table) does not drag
+  // the highlight outwards.
   const end = Math.min(bestStart + windowSize, pageWords.length);
-  const itemIndices = new Set();
+  const remaining = new Map(need);
+  const matchedPositions = [];
   for (let i = bestStart; i < end; i++) {
-    itemIndices.add(pageWords[i].itemIndex);
+    const left = remaining.get(pageWords[i].word) || 0;
+    if (left > 0) {
+      remaining.set(pageWords[i].word, left - 1);
+      matchedPositions.push(i);
+    }
   }
+  if (matchedPositions.length === 0) return [];
+
+  const keep = Math.max(1, Math.ceil(matchedPositions.length * 0.8));
+  let first = matchedPositions[0];
+  let last = matchedPositions[matchedPositions.length - 1];
+  let bestSpan = Infinity;
+  for (let k = 0; k + keep - 1 < matchedPositions.length; k++) {
+    const span = matchedPositions[k + keep - 1] - matchedPositions[k];
+    if (span < bestSpan) {
+      bestSpan = span;
+      first = matchedPositions[k];
+      last = matchedPositions[k + keep - 1];
+    }
+  }
+
+  const itemIndices = new Set();
+  for (let i = first; i <= last; i++) itemIndices.add(pageWords[i].itemIndex);
   return Array.from(itemIndices).sort((a, b) => a - b);
 }
 

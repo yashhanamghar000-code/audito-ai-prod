@@ -281,7 +281,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       assistantId: string,
       fullText: string,
       followUps: string[] = [],
-      citations: { source: string; page: number | null; file_id: string | null }[] = [],
+      citations: NonNullable<Message["citations"]> = [],
     ) => {
       stopRef.current = false;
       setIsStreaming(true);

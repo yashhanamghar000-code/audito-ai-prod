@@ -2,10 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { AuditoLogo } from "@/components/brand/AuditoLogo";
+import { AuthField, PasswordField } from "@/components/auth/AuthField";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -35,63 +32,61 @@ function LoginPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="w-full"
-    >
-      <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <AuditoLogo className="h-10 w-10" />
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">Sign in to continue to AUDITO AI</p>
-      </div>
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground">Welcome back</p>
+      <h1 className="font-display mt-5 text-4xl font-normal leading-tight tracking-tight">
+        Sign in to <span className="text-highlight">audit</span> workspace
+      </h1>
+      <p className="mt-5 text-[15px] leading-relaxed text-muted-foreground">
+        Chat with your PDFs and get structured summaries, with answers grounded in the source and cited to the page.
+      </p>
 
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <button
-              type="button"
-              onClick={() => toast.info("Password reset link sent (placeholder)")}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Forgot password?
-            </button>
-          </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
+      <form onSubmit={onSubmit} className="mt-10 space-y-6">
+        <AuthField
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="you@company.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="current-password"
+          required
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          right={
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => toast.info("Password reset is not available yet. Please contact your administrator.")}
+                className="text-sm font-medium text-brand hover:underline"
+              >
+                Forgot password?
+              </button>
+            </div>
+          }
+        />
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Login
-        </Button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-brand text-[15px] font-medium text-brand-foreground shadow-sm transition-[filter,transform] hover:brightness-110 active:scale-[0.99] disabled:opacity-70"
+        >
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          Sign in <span aria-hidden>→</span>
+        </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-muted-foreground">
-        Don't have an account?{" "}
-        <Link to="/auth/register" className="font-medium text-foreground underline underline-offset-4">
-          Register
+      <p className="mt-10 text-center text-[15px] text-muted-foreground">
+        New to AUDITO?{" "}
+        <Link to="/auth/register" className="font-medium text-brand underline underline-offset-4">
+          Create an account
         </Link>
       </p>
     </motion.div>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
-  MessageSquarePlus,
+  SquarePen,
+  FileText,
   Search,
   Settings as SettingsIcon,
   LogOut,
@@ -51,6 +52,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -86,54 +88,64 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   return (
     <div className="flex h-full flex-col">
       {/* Top */}
-      <div className="p-4">
-        <Link to="/" className="mb-4 block">
-          <AuditoWordmark />
-        </Link>
-
-        <div className="mb-3 flex gap-1 rounded-lg bg-muted p-1">
-          <Link
-            to="/chat"
-            className={cn(
-              "flex-1 rounded-md px-2.5 py-1.5 text-center text-xs font-medium transition-colors",
-              location.pathname === "/chat"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            Chat
+      <div className="px-3 pb-2 pt-4">
+        <div className="mb-3 flex items-center justify-between px-1">
+          <Link to="/" onClick={onNavigate} className="block">
+            <AuditoWordmark />
           </Link>
-          <Link
-            to="/summarize"
-            className={cn(
-              "flex-1 rounded-md px-2.5 py-1.5 text-center text-xs font-medium transition-colors",
-              location.pathname === "/summarize"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label="Search chats"
           >
-            Summarize
-          </Link>
+            <Search className="h-4 w-4" />
+          </Button>
         </div>
 
-        <Button
-          onClick={handleNewChat}
-          className="w-full justify-start gap-2"
-          variant="outline"
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-          New Chat
-        </Button>
-
-        <div className="relative mt-3">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        {searchOpen && (
           <Input
+            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search chats"
-            className="h-9 pl-8 text-sm"
+            className="mb-2 h-9 text-sm"
           />
-        </div>
+        )}
+
+        <nav className="space-y-0.5">
+          <button
+            onClick={handleNewChat}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+              location.pathname === "/chat"
+                ? "bg-sidebar-accent text-brand"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            <SquarePen className="h-[18px] w-[18px]" />
+            New chat
+          </button>
+          <Link
+            to="/summarize"
+            onClick={onNavigate}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+              location.pathname === "/summarize"
+                ? "bg-sidebar-accent text-brand"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            <FileText className="h-[18px] w-[18px]" />
+            Summarize
+          </Link>
+        </nav>
+      </div>
+
+      <div className="mx-3 mt-1 border-t border-sidebar-border" />
+      <div className="px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        Chats
       </div>
 
       {/* Conversations */}
@@ -239,7 +251,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
       {/* Footer */}
       <div className="flex items-center justify-between gap-2 p-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-highlight/15 text-xs font-semibold text-highlight">
             {(user?.name ?? "U").slice(0, 1).toUpperCase()}
           </div>
           <div className="min-w-0">

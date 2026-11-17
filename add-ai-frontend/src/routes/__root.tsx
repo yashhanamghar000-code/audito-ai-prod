@@ -77,13 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AUDITO AI — Multi-Model RAG Chat" },
+      { title: "AUDITO AI — Document Intelligence" },
       {
         name: "description",
         content:
           "AUDITO AI is a professional multi-model RAG assistant for auditing your documents with grounded, verifiable answers.",
       },
-      { property: "og:title", content: "AUDITO AI — Multi-Model RAG Chat" },
+      { property: "og:title", content: "AUDITO AI — Document Intelligence" },
       {
         property: "og:description",
         content:
@@ -95,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap",
       },
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },

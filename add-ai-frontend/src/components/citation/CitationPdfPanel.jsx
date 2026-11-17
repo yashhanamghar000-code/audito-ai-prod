@@ -29,14 +29,15 @@
  */
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { X, Loader2, FileWarning } from "lucide-react";
 import { getAuthHeaders, getDocumentFileUrl } from "../../lib/citationApi";
 import { computeHighlightRects, findMatchingItemIndices } from "../../lib/pdfTextHighlight";
 
-// pdf.js needs its worker script. The CDN URL below matches whatever
-// pdfjs-dist version npm installs, so it stays in sync automatically and
-// needs zero bundler configuration.
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// pdf.js needs its worker script. Bundle it with the app (Vite `?url`) instead
+// of loading it from a CDN: the CDN may not host this exact pdfjs-dist version,
+// and a blocked/missing worker means no PDF and no highlight at all.
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const PANEL_PADDING_PX = 32; // matches the body's px-4 (16px) * 2
 
@@ -46,6 +47,7 @@ export default function CitationPdfPanel({ citation, onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pageWidth, setPageWidth] = useState(420);
+  const [highlightState, setHighlightState] = useState("pending"); // pending | found | missing
 
   const scrollContainerRef = useRef(null);
   const pageRefs = useRef({}); // pageNumber -> HTMLDivElement
@@ -74,6 +76,7 @@ export default function CitationPdfPanel({ citation, onClose }) {
     setLoading(true);
     setError(null);
     setPdfDoc(null);
+    setHighlightState("pending");
     pageRefs.current = {};
 
     const loadingTask = pdfjsLib.getDocument({
@@ -124,7 +127,11 @@ export default function CitationPdfPanel({ citation, onClose }) {
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             Page {targetPage}
-            {citation.bbox ? " · scanned page (OCR match)" : snippet ? " · text match" : ""}
+            {highlightState === "found"
+              ? " · cited passage highlighted"
+              : highlightState === "missing"
+                ? " · exact line not located on this page"
+                : ""}
           </div>
         </div>
         <button
@@ -162,6 +169,7 @@ export default function CitationPdfPanel({ citation, onClose }) {
               bbox={pageNumber === targetPage ? citation.bbox : null}
               pageWidthPt={citation.page_width}
               pageHeightPt={citation.page_height}
+              onHighlight={setHighlightState}
               registerRef={(el) => (pageRefs.current[pageNumber] = el)}
             />
           ))}
@@ -177,9 +185,10 @@ export default function CitationPdfPanel({ citation, onClose }) {
  * directly when present (OCR'd pages); otherwise falls back to searching
  * pdf.js's text layer for `snippet` (normal, non-scanned pages).
  */
-function PdfPage({ pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pageWidthPt, pageHeightPt, registerRef }) {
+function PdfPage({ pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pageWidthPt, pageHeightPt, onHighlight, registerRef }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const firstHighlightRef = useRef(null);
   const [highlightRects, setHighlightRects] = useState([]);
   const [rendered, setRendered] = useState(false);
   const [cssSize, setCssSize] = useState({ width: targetWidth, height: targetWidth * 1.3 });
@@ -233,6 +242,7 @@ function PdfPage({ pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pag
             height: (bbox.y1 - bbox.y0) * scaleY,
           },
         ]);
+        onHighlight?.("found");
         return;
       }
 
@@ -243,14 +253,32 @@ function PdfPage({ pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pag
         const matchedIndices = findMatchingItemIndices(textContent, snippet);
         if (matchedIndices.length > 0) {
           setHighlightRects(computeHighlightRects(textContent, matchedIndices, viewport));
+          onHighlight?.("found");
+          return;
         }
       }
+      onHighlight?.("missing");
     });
 
     return () => {
       cancelled = true;
     };
   }, [pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pageWidthPt, pageHeightPt]);
+
+  // Once the highlight is drawn, scroll so it sits near the top of the panel
+  // (scrolling only to the page start leaves long pages with the highlight
+  // off-screen).
+  useEffect(() => {
+    if (!isTarget || !rendered || highlightRects.length === 0) return;
+    const hl = firstHighlightRef.current;
+    const scroller = containerRef.current?.closest(".overflow-y-auto");
+    if (!hl || !scroller) return;
+    const t = setTimeout(() => {
+      const delta = hl.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      scroller.scrollTo({ top: scroller.scrollTop + delta - 96, behavior: "smooth" });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [isTarget, rendered, highlightRects]);
 
   return (
     <div
@@ -270,13 +298,16 @@ function PdfPage({ pdfDoc, pageNumber, targetWidth, isTarget, snippet, bbox, pag
           highlightRects.map((rect, i) => (
             <div
               key={i}
+              ref={i === 0 ? firstHighlightRef : null}
+              data-citation-highlight
               className="pointer-events-none absolute rounded-[2px]"
               style={{
                 left: rect.left,
                 top: rect.top,
                 width: rect.width,
                 height: rect.height,
-                backgroundColor: "rgba(250, 204, 21, 0.55)",
+                mixBlendMode: "multiply",
+                backgroundColor: "rgba(250, 204, 21, 0.6)",
                 boxShadow: "0 0 0 1px rgba(202, 138, 4, 0.5)",
               }}
             />

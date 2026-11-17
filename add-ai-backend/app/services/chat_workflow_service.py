@@ -323,25 +323,28 @@ class ChatWorkflowService:
                 parts = body.split("\n", 1)
                 body = parts[1] if len(parts) > 1 else ""
 
-            body = body.split("### Extracted Document Tables:")[0]  # drop trailing table markdown
+            body, _, table_part = body.partition("### Extracted Document Tables:")
             body = body.strip()
 
-            # Table-derived chunks have their numbers rearranged into
-            # markdown "| ... | ... |" cells that never appear verbatim on
-            # the actual rendered PDF page (the page shows a real table
-            # layout, not pipe-delimited text) — searching for that text
-            # on the page can never succeed, so skip the highlight attempt
-            # entirely rather than sending a snippet that's guaranteed not
-            # to match. The frontend still scrolls to the correct page.
-            if d.metadata.get("has_table"):
-                snippet = None
+            # Pick the text to highlight. Prefer the prose of the chunk. If the
+            # chunk is (almost) only a table, use the table's cell text with the
+            # markdown scaffolding ("|", "---") removed: the cells' words do
+            # appear on the rendered page, and the frontend's order-tolerant
+            # matcher can locate them, so table citations are highlighted too
+            # instead of only scrolling to the page.
+            def _plain(text: str) -> str:
+                text = re.sub(r"[|]", " ", text)
+                text = re.sub(r"(?m)^\s*:?-{2,}:?[\s:|-]*$", " ", text)
+                return " ".join(text.split())
+
+            prose = _plain(body)
+            if len(prose.split()) >= 6 or not table_part.strip():
+                snippet_source = prose
             else:
-                # 24 words (not the whole chunk) — long enough to be a
-                # distinctive fingerprint that won't collide with an
-                # unrelated repeated phrase elsewhere on the page, short
-                # enough that the frontend's fuzzy line-matcher can still
-                # tolerate a few OCR/spacing mismatches and find it.
-                snippet = " ".join(body.split()[:24]) or None
+                snippet_source = (prose + " " + _plain(table_part)).strip()
+            # 24 words: distinctive enough not to collide with a repeated phrase
+            # elsewhere on the page, short enough to tolerate OCR/spacing noise.
+            snippet = " ".join(snippet_source.split()[:24]) or None
 
             # Scanned pages have no embedded PDF text layer at all, so
             # pdf.js's client-side text search (which the frontend falls

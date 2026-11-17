@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { AuditoLogo } from "@/components/brand/AuditoLogo";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { useChat } from "@/contexts/ChatContext";
+import { PENDING_PROMPT_KEY } from "@/components/home/HomeHub";
 import { useAuth } from "@/contexts/AuthContext";
 
 function getGreeting(): string {
@@ -16,7 +16,7 @@ function getGreeting(): string {
 }
 
 export function ChatArea() {
-  const { activeConversation, isStreaming } = useChat();
+  const { activeConversation, isStreaming, sendMessage } = useChat();
   const { user } = useAuth();
   const bottomRef = useRef<HTMLDivElement>(null);
   const messages = activeConversation?.messages ?? [];
@@ -24,6 +24,22 @@ export function ChatArea() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, isStreaming, messages]);
+
+  // A prompt typed on the home page: send it once this chat is mounted with the
+  // new conversation active. Removed from storage first so it can only ever fire once.
+  const activeId = activeConversation?.id;
+  useEffect(() => {
+    if (!activeId) return;
+    let pending: string | null = null;
+    try {
+      pending = window.sessionStorage.getItem(PENDING_PROMPT_KEY);
+      if (pending) window.sessionStorage.removeItem(PENDING_PROMPT_KEY);
+    } catch {
+      pending = null;
+    }
+    if (pending) void sendMessage(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   const empty = messages.length === 0;
   const firstName = user?.name?.split(" ")[0];
@@ -38,12 +54,16 @@ export function ChatArea() {
             transition={{ duration: 0.35 }}
             className="flex flex-col items-center"
           >
-            <AuditoLogo className="h-16 w-16" />
-            <h1 className="mt-5 text-2xl font-semibold tracking-tight md:text-3xl">
-              {getGreeting()}{firstName ? `, ${firstName}` : ""}
+            <h1 className="font-display text-4xl font-normal tracking-tight md:text-5xl">
+              {getGreeting()}
+              {firstName ? (
+                <>
+                  , <span className="text-highlight">{firstName}</span>
+                </>
+              ) : null}
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground md:text-base">
-              What would you like to do today?
+            <p className="mt-3 text-base text-muted-foreground">
+              Upload a PDF and ask anything about it.
             </p>
           </motion.div>
           <div className="mt-8 w-full max-w-2xl">

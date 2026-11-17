@@ -152,6 +152,34 @@ def test_citations_deduplicate_same_page():
     assert len(build(llm, docs).run("q", "7", "s1").citations) == 1
 
 
+def test_citation_snippet_for_prose_chunk_is_first_24_words_without_scaffolding():
+    words = " ".join(f"w{i}" for i in range(40))
+    cites = ChatWorkflowService._build_citations([chunk(words)])
+    assert cites[0]["snippet"] == " ".join(f"w{i}" for i in range(24))
+    assert "ATTENTION" not in cites[0]["snippet"]
+
+
+def test_citation_snippet_for_table_chunk_uses_cell_text_not_markdown():
+    table = (
+        "### Extracted Document Tables:\n"
+        "| Item | Amount | Date |\n| --- | --- | --- |\n"
+        "| Rent | 1200 | 2024-01-01 |\n"
+    )
+    cites = ChatWorkflowService._build_citations([chunk(table, has_table=True)])
+    snippet = cites[0]["snippet"]
+    assert snippet is not None
+    assert "|" not in snippet and "---" not in snippet
+    assert "Rent" in snippet and "1200" in snippet
+
+
+def test_citation_snippet_prefers_prose_when_chunk_has_prose_and_table():
+    text = ("The tenant shall pay the monthly rent on the first day of each month.\n"
+            "### Extracted Document Tables:\n| a | b |\n")
+    snippet = ChatWorkflowService._build_citations([chunk(text, has_table=True)])[0]["snippet"]
+    assert snippet.startswith("The tenant shall pay")
+    assert "|" not in snippet
+
+
 # ------------------------------------------------------------------ conversation history
 def test_history_is_sent_before_the_new_question():
     llm = FakeLLM()

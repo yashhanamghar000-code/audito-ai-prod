@@ -15,6 +15,10 @@ export interface Citation {
   source: string;
   page: number | null;
   file_id: string | null;
+  snippet?: string | null;
+  bbox?: { x0: number; y0: number; x1: number; y1: number } | null;
+  page_width?: number | null;
+  page_height?: number | null;
 }
 
 export interface ChatResponse {

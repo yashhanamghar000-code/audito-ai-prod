@@ -7,7 +7,14 @@ import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export function ChatInput() {
+export function ChatInput({
+  onSubmitText,
+  large = false,
+}: {
+  /** Home page: hand the text to the caller instead of sending in the current chat. */
+  onSubmitText?: (text: string) => void;
+  large?: boolean;
+} = {}) {
   const { sendMessage, isStreaming, stopGeneration, uploadDocument } = useChat();
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,6 +42,10 @@ export function ChatInput() {
     if (!text || isStreaming) return;
     if (isListening) toggleMic();
     setValue("");
+    if (onSubmitText) {
+      onSubmitText(text);
+      return;
+    }
     await sendMessage(text);
   }
 
@@ -53,7 +64,7 @@ export function ChatInput() {
   const canSend = value.trim().length > 0 && !isStreaming;
 
   return (
-    <div className="relative">
+    <div className="gradient-ring-wrap relative">
       <input
         ref={fileRef}
         type="file"
@@ -70,7 +81,13 @@ export function ChatInput() {
           }
         }}
       />
-      <div className="flex items-end gap-2 rounded-3xl border border-border bg-card p-2.5 shadow-sm transition-shadow focus-within:shadow-md">
+      <div className="gradient-ring pointer-events-none absolute inset-0 rounded-3xl" aria-hidden />
+      <div
+        className={cn(
+          "relative m-px flex items-end gap-2 rounded-[calc(1.5rem-1px)] bg-card p-2.5 shadow-sm transition-shadow focus-within:shadow-md",
+          large && "min-h-[130px] flex-wrap p-4",
+        )}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -90,12 +107,14 @@ export function ChatInput() {
             setValue(e.target.value);
           }}
           onKeyDown={onKey}
-          rows={1}
-          placeholder={isListening ? "Listening..." : "Ask AUDITO AI anything..."}
+          rows={large ? 2 : 1}
+          placeholder={isListening ? "Listening..." : "Ask AUDITO anything about your documents..."}
           className={cn(
             "min-h-[36px] flex-1 resize-none bg-transparent px-1 py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground",
+            large && "order-first min-h-[64px] basis-full text-base",
           )}
         />
+        {large && <div className="flex-1" />}
         {micSupported ? (
           <Button
             variant={isListening ? "default" : "ghost"}
